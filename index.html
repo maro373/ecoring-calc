@@ -1,0 +1,511 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="入札計算">
+  <meta name="theme-color" content="#1a1a2e">
+  <title>エコリング入札計算ツール</title>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #0f0f1a;
+      --surface: #1a1a2e;
+      --surface2: #22223a;
+      --border: rgba(255,255,255,0.08);
+      --accent: #7c6ef5;
+      --accent2: #56e39f;
+      --warn: #f5a623;
+      --danger: #f55656;
+      --text: #f0f0f8;
+      --text2: #9090b0;
+      --text3: #5a5a7a;
+      --mono: 'DM Mono', monospace;
+      --sans: 'Noto Sans JP', sans-serif;
+    }
+
+    html, body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--sans);
+      font-size: 15px;
+      min-height: 100vh;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    header {
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      padding: 16px 20px 14px;
+      position: sticky;
+      top: 0;
+      z-index: 10;
+    }
+
+    .header-inner {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .header-icon {
+      width: 32px;
+      height: 32px;
+      background: linear-gradient(135deg, var(--accent), #a78bfa);
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 16px;
+    }
+
+    .header-title {
+      font-size: 16px;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+    }
+
+    .header-sub {
+      font-size: 11px;
+      color: var(--text3);
+      margin-top: 1px;
+    }
+
+    main {
+      padding: 16px;
+      max-width: 480px;
+      margin: 0 auto;
+      padding-bottom: 40px;
+    }
+
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 18px;
+      margin-bottom: 14px;
+    }
+
+    .card-title {
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      color: var(--accent);
+      text-transform: uppercase;
+      margin-bottom: 14px;
+    }
+
+    .field { margin-bottom: 14px; }
+    .field:last-child { margin-bottom: 0; }
+
+    .field-label {
+      font-size: 12px;
+      color: var(--text2);
+      margin-bottom: 6px;
+      display: block;
+    }
+
+    input[type=number], select {
+      width: 100%;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      color: var(--text);
+      font-family: var(--sans);
+      font-size: 15px;
+      padding: 11px 14px;
+      outline: none;
+      transition: border-color 0.2s;
+      -webkit-appearance: none;
+      appearance: none;
+    }
+
+    input[type=number]:focus, select:focus {
+      border-color: var(--accent);
+    }
+
+    input[type=number]::placeholder { color: var(--text3); }
+
+    .select-wrap {
+      position: relative;
+    }
+    .select-wrap::after {
+      content: '▾';
+      position: absolute;
+      right: 14px;
+      top: 50%;
+      transform: translateY(-50%);
+      color: var(--text3);
+      pointer-events: none;
+      font-size: 13px;
+    }
+
+    /* Toggle */
+    .toggle-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+    }
+
+    .toggle-btn {
+      padding: 10px 8px;
+      font-size: 13px;
+      font-family: var(--sans);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      background: var(--surface2);
+      color: var(--text2);
+      cursor: pointer;
+      text-align: center;
+      transition: all 0.2s;
+      font-weight: 500;
+    }
+
+    .toggle-btn.active {
+      background: rgba(124,110,245,0.15);
+      border-color: var(--accent);
+      color: var(--accent);
+    }
+
+    /* Slider */
+    .slider-row {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    input[type=range] {
+      flex: 1;
+      -webkit-appearance: none;
+      appearance: none;
+      height: 4px;
+      border-radius: 2px;
+      background: var(--surface2);
+      outline: none;
+    }
+
+    input[type=range]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 20px;
+      height: 20px;
+      border-radius: 50%;
+      background: var(--accent);
+      cursor: pointer;
+      box-shadow: 0 0 0 4px rgba(124,110,245,0.2);
+    }
+
+    .slider-val {
+      font-family: var(--mono);
+      font-size: 14px;
+      color: var(--accent);
+      min-width: 40px;
+      text-align: right;
+    }
+
+    /* Result bid box */
+    .bid-box {
+      background: rgba(86,227,159,0.08);
+      border: 1px solid rgba(86,227,159,0.25);
+      border-radius: 16px;
+      padding: 20px;
+      text-align: center;
+      margin-bottom: 14px;
+    }
+
+    .bid-label {
+      font-size: 11px;
+      color: var(--accent2);
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      margin-bottom: 6px;
+    }
+
+    .bid-value {
+      font-family: var(--mono);
+      font-size: 36px;
+      font-weight: 500;
+      color: var(--accent2);
+      letter-spacing: -0.02em;
+    }
+
+    .bid-value.red { color: var(--danger); }
+
+    /* Metrics */
+    .metrics {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+      margin-bottom: 14px;
+    }
+
+    .metric {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 14px;
+    }
+
+    .metric-label {
+      font-size: 11px;
+      color: var(--text3);
+      margin-bottom: 4px;
+    }
+
+    .metric-value {
+      font-family: var(--mono);
+      font-size: 20px;
+      font-weight: 500;
+    }
+
+    .c-green { color: var(--accent2); }
+    .c-amber { color: var(--warn); }
+    .c-red { color: var(--danger); }
+
+    /* Detail rows */
+    .detail-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 13px;
+      padding: 8px 0;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .detail-row:last-child { border-bottom: none; }
+
+    .detail-row span:first-child { color: var(--text2); }
+
+    .detail-row span:last-child {
+      font-family: var(--mono);
+      color: var(--text);
+    }
+
+    .detail-row.total {
+      padding-top: 10px;
+      margin-top: 4px;
+    }
+
+    .detail-row.total span:first-child {
+      color: var(--text);
+      font-weight: 700;
+      font-size: 13px;
+    }
+
+    .detail-row.total span:last-child {
+      font-size: 16px;
+      font-weight: 500;
+    }
+
+    /* Warning */
+    .warn-box {
+      background: rgba(245,166,35,0.1);
+      border: 1px solid rgba(245,166,35,0.3);
+      border-radius: 10px;
+      padding: 12px 14px;
+      font-size: 13px;
+      color: var(--warn);
+      margin-bottom: 14px;
+      display: none;
+    }
+
+    .note {
+      font-size: 11px;
+      color: var(--text3);
+      text-align: center;
+      padding: 8px 0 0;
+    }
+
+    #result { display: none; }
+
+    .divider {
+      height: 1px;
+      background: var(--border);
+      margin: 14px 0;
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="header-inner">
+    <div class="header-icon">🏷️</div>
+    <div>
+      <div class="header-title">エコリング入札計算</div>
+      <div class="header-sub">メルカリ販売 利益シミュレーター</div>
+    </div>
+  </div>
+</header>
+
+<main>
+
+  <!-- 設定カード -->
+  <div class="card">
+    <div class="card-title">販売・発送の設定</div>
+
+    <div class="field">
+      <label class="field-label">メルカリ販売予定価格（円）</label>
+      <input type="number" id="sellPrice" placeholder="例：30000" inputmode="numeric" oninput="calc()" min="0">
+    </div>
+
+    <div class="field">
+      <label class="field-label">らくらくメルカリ便（発送方法）</label>
+      <div class="select-wrap">
+        <select id="shipping" onchange="calc()">
+          <option value="210">ネコポス ¥210</option>
+          <option value="450">宅急便コンパクト ¥450</option>
+          <option value="750">宅急便 60サイズ ¥750</option>
+          <option value="870">宅急便 80サイズ ¥870</option>
+          <option value="1060">宅急便 100サイズ ¥1,060</option>
+          <option value="1200">宅急便 120サイズ ¥1,200</option>
+          <option value="1450">宅急便 140サイズ ¥1,450</option>
+          <option value="1700">宅急便 160サイズ ¥1,700</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="field">
+      <label class="field-label">エコリング落札手数料（税抜き）</label>
+      <div class="select-wrap">
+        <select id="ecoFee" onchange="calc()">
+          <option value="500">¥500（落札額 〜¥10,000）</option>
+          <option value="1000" selected>¥1,000（落札額 ¥10,001〜¥49,999）</option>
+          <option value="2000">¥2,000（落札額 ¥50,000〜¥99,999）</option>
+          <option value="4000">¥4,000（落札額 ¥100,000〜¥499,999）</option>
+          <option value="8000">¥8,000（落札額 ¥500,000〜¥999,999）</option>
+          <option value="10000">¥10,000（落札額 ¥1,000,000〜）</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="field">
+      <label class="field-label">エコリング送料</label>
+      <div class="toggle-row">
+        <button class="toggle-btn active" id="btn_with" onclick="setEcoShipping(true)">送料あり ¥1,300</button>
+        <button class="toggle-btn" id="btn_without" onclick="setEcoShipping(false)">送料なし ¥0</button>
+      </div>
+    </div>
+
+    <div class="field">
+      <label class="field-label">目標利益率：<span id="profitOut" style="color:var(--accent);font-family:var(--mono);">20%</span></label>
+      <div class="slider-row">
+        <input type="range" min="5" max="50" step="1" value="20" id="profitSlider"
+          oninput="document.getElementById('profitOut').textContent=this.value+'%'; calc()">
+        <span class="slider-val" id="sliderVal">20%</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- 結果 -->
+  <div id="result">
+    <div class="warn-box" id="warnBox">⚠️ 入札上限がマイナスです。販売価格を上げるか利益率を下げてください。</div>
+
+    <div class="bid-box">
+      <div class="bid-label">エコリング 上限入札額（税抜き）</div>
+      <div class="bid-value" id="bidVal">—</div>
+    </div>
+
+    <div class="metrics">
+      <div class="metric">
+        <div class="metric-label">見込み利益</div>
+        <div class="metric-value c-green" id="profitVal">—</div>
+      </div>
+      <div class="metric">
+        <div class="metric-label">仕入れ総コスト</div>
+        <div class="metric-value c-amber" id="totalCostVal">—</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">エコリング 仕入れ内訳</div>
+      <div class="detail-row"><span>落札価格（税抜き）</span><span id="r_bid">—</span></div>
+      <div class="detail-row"><span>消費税（10%）</span><span id="r_tax">—</span></div>
+      <div class="detail-row"><span>落札手数料</span><span id="r_fee">—</span></div>
+      <div class="detail-row"><span>手数料消費税（10%）</span><span id="r_feetax">—</span></div>
+      <div class="detail-row" id="row_ecoship"><span>エコリング送料</span><span id="r_ecoship">—</span></div>
+      <div class="divider"></div>
+      <div class="detail-row total"><span>仕入れ総コスト</span><span id="r_total">—</span></div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">メルカリ 収支内訳</div>
+      <div class="detail-row"><span>販売価格</span><span id="r_sell">—</span></div>
+      <div class="detail-row"><span>メルカリ手数料（10%）</span><span id="r_mfee">—</span></div>
+      <div class="detail-row"><span>メルカリ送料</span><span id="r_mship">—</span></div>
+      <div class="detail-row"><span>手取り</span><span id="r_net">—</span></div>
+      <div class="detail-row"><span>仕入れ総コスト</span><span id="r_cost2">—</span></div>
+      <div class="divider"></div>
+      <div class="detail-row total"><span>見込み利益</span><span id="r_profit">—</span></div>
+    </div>
+
+    <p class="note">※エコリング落札手数料は2025年4月改定後の料率です</p>
+  </div>
+
+</main>
+
+<script>
+  const MERCARI_FEE = 0.10;
+  const ECORING_TAX = 0.10;
+  let ecoShipping = 1300;
+
+  function setEcoShipping(on) {
+    ecoShipping = on ? 1300 : 0;
+    document.getElementById('btn_with').className = 'toggle-btn' + (on ? ' active' : '');
+    document.getElementById('btn_without').className = 'toggle-btn' + (!on ? ' active' : '');
+    calc();
+  }
+
+  function fmt(n) { return '¥' + Math.round(n).toLocaleString(); }
+
+  document.getElementById('profitSlider').addEventListener('input', function() {
+    document.getElementById('sliderVal').textContent = this.value + '%';
+    document.getElementById('profitOut').textContent = this.value + '%';
+    calc();
+  });
+
+  function calc() {
+    const sell = parseFloat(document.getElementById('sellPrice').value);
+    if (!sell || sell <= 0) { document.getElementById('result').style.display = 'none'; return; }
+
+    const profitRate = parseInt(document.getElementById('profitSlider').value) / 100;
+    const mShipping = parseInt(document.getElementById('shipping').value);
+    const fee = parseInt(document.getElementById('ecoFee').value);
+    const feeTaxed = fee * (1 + ECORING_TAX);
+
+    const mercariNet = sell * (1 - MERCARI_FEE) - mShipping;
+    const targetProfit = sell * profitRate;
+    const allowedCost = mercariNet - targetProfit;
+    const bid = Math.max(0, Math.floor((allowedCost - feeTaxed - ecoShipping) / (1 + ECORING_TAX)));
+    const totalCost = Math.round(bid * (1 + ECORING_TAX)) + Math.round(feeTaxed) + ecoShipping;
+    const profit = Math.round(mercariNet - totalCost);
+    const isNeg = bid <= 0 || profit < 0;
+
+    document.getElementById('result').style.display = 'block';
+    document.getElementById('warnBox').style.display = isNeg ? 'block' : 'none';
+    document.getElementById('bidVal').textContent = bid > 0 ? fmt(bid) : '計算不能';
+    document.getElementById('bidVal').className = 'bid-value' + (isNeg ? ' red' : '');
+    document.getElementById('profitVal').textContent = fmt(profit);
+    document.getElementById('profitVal').className = 'metric-value ' + (profit >= 0 ? 'c-green' : 'c-red');
+    document.getElementById('totalCostVal').textContent = fmt(totalCost);
+
+    document.getElementById('r_bid').textContent = fmt(bid);
+    document.getElementById('r_tax').textContent = fmt(bid * ECORING_TAX);
+    document.getElementById('r_fee').textContent = fmt(fee);
+    document.getElementById('r_feetax').textContent = fmt(feeTaxed - fee);
+    document.getElementById('r_ecoship').textContent = fmt(ecoShipping);
+    document.getElementById('r_total').textContent = fmt(totalCost);
+
+    document.getElementById('r_sell').textContent = fmt(sell);
+    document.getElementById('r_mfee').textContent = '▲' + fmt(sell * MERCARI_FEE);
+    document.getElementById('r_mship').textContent = '▲' + fmt(mShipping);
+    document.getElementById('r_net').textContent = fmt(mercariNet);
+    document.getElementById('r_cost2').textContent = '▲' + fmt(totalCost);
+    document.getElementById('r_profit').textContent = fmt(profit);
+  }
+</script>
+</body>
+</html>
+ecoring_calculator.html を表示しています。
