@@ -1,0 +1,798 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>仕入れリサーチAI</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@300;400;500;700;900&family=Space+Mono:wght@400;700&display=swap');
+
+  :root {
+    --bg: #0d0d0f;
+    --surface: #16161a;
+    --surface2: #1e1e24;
+    --border: #2a2a35;
+    --accent: #00e5a0;
+    --mercari: #ff0211;
+    --yahoo: #ff0033;
+    --text: #e8e8f0;
+    --muted: #6b6b80;
+    --card-glow: 0 0 30px rgba(0,229,160,0.08);
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Noto Sans JP', sans-serif;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image:
+      linear-gradient(rgba(0,229,160,0.03) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(0,229,160,0.03) 1px, transparent 1px);
+    background-size: 40px 40px;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .container {
+    max-width: 700px;
+    margin: 0 auto;
+    padding: 24px 16px 60px;
+    position: relative;
+    z-index: 1;
+  }
+
+  header {
+    text-align: center;
+    padding: 40px 0 28px;
+  }
+
+  .badge {
+    display: inline-block;
+    background: rgba(0,229,160,0.1);
+    border: 1px solid rgba(0,229,160,0.3);
+    color: var(--accent);
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 3px;
+    padding: 4px 12px;
+    border-radius: 2px;
+    margin-bottom: 16px;
+    text-transform: uppercase;
+  }
+
+  h1 {
+    font-size: clamp(22px, 6vw, 32px);
+    font-weight: 900;
+    line-height: 1.2;
+    letter-spacing: -0.5px;
+    margin-bottom: 8px;
+  }
+
+  h1 span { color: var(--accent); }
+
+  .subtitle {
+    color: var(--muted);
+    font-size: 13px;
+    font-weight: 300;
+  }
+
+  /* ========== APIキー設定パネル ========== */
+  #apiKeyPanel {
+    background: var(--surface);
+    border: 1px solid rgba(0,229,160,0.25);
+    border-radius: 12px;
+    padding: 20px;
+    margin-bottom: 20px;
+  }
+
+  #apiKeyPanel.saved {
+    border-color: var(--border);
+    padding: 12px 20px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+  }
+
+  .api-title {
+    font-size: 11px;
+    letter-spacing: 2px;
+    color: var(--accent);
+    text-transform: uppercase;
+    font-family: 'Space Mono', monospace;
+    margin-bottom: 10px;
+  }
+
+  .api-desc {
+    font-size: 12px;
+    color: var(--muted);
+    line-height: 1.7;
+    margin-bottom: 14px;
+  }
+
+  .api-desc a {
+    color: var(--accent);
+    text-decoration: none;
+  }
+
+  .api-input-row {
+    display: flex;
+    gap: 8px;
+  }
+
+  input[type="password"], input[type="text"] {
+    flex: 1;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    color: var(--text);
+    font-family: 'Space Mono', monospace;
+    font-size: 13px;
+    padding: 10px 14px;
+    outline: none;
+    transition: border-color 0.2s;
+  }
+
+  input[type="password"]:focus, input[type="text"]:focus {
+    border-color: var(--accent);
+  }
+
+  input[type="password"]::placeholder, input[type="text"]::placeholder {
+    color: var(--muted);
+    font-size: 12px;
+    font-family: 'Noto Sans JP', sans-serif;
+  }
+
+  .btn-save {
+    background: var(--accent);
+    color: #000;
+    border: none;
+    border-radius: 8px;
+    padding: 10px 18px;
+    font-family: 'Noto Sans JP', sans-serif;
+    font-weight: 700;
+    font-size: 13px;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: all 0.2s;
+    flex-shrink: 0;
+  }
+
+  .btn-save:hover { background: #00ffb3; }
+
+  .api-saved-label {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 12px;
+    color: var(--accent);
+    font-family: 'Space Mono', monospace;
+  }
+
+  .api-saved-label::before {
+    content: '●';
+    font-size: 8px;
+    animation: pulse 2s infinite;
+  }
+
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.3; }
+  }
+
+  .btn-reset {
+    background: none;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    color: var(--muted);
+    font-size: 11px;
+    padding: 5px 10px;
+    cursor: pointer;
+    font-family: 'Space Mono', monospace;
+    transition: all 0.15s;
+    white-space: nowrap;
+  }
+
+  .btn-reset:hover { border-color: #ff6b6b; color: #ff6b6b; }
+
+  /* ========== 検索ボックス ========== */
+  .search-box {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 20px;
+    margin-bottom: 20px;
+    box-shadow: var(--card-glow);
+  }
+
+  .search-label {
+    font-size: 11px;
+    letter-spacing: 2px;
+    color: var(--muted);
+    text-transform: uppercase;
+    margin-bottom: 10px;
+    font-family: 'Space Mono', monospace;
+  }
+
+  .input-row {
+    display: flex;
+    gap: 10px;
+    align-items: stretch;
+  }
+
+  #queryInput {
+    font-family: 'Noto Sans JP', sans-serif !important;
+    font-size: 15px !important;
+  }
+
+  .search-btn {
+    background: var(--accent);
+    color: #000;
+    border: none;
+    border-radius: 8px;
+    padding: 12px 20px;
+    font-family: 'Noto Sans JP', sans-serif;
+    font-weight: 700;
+    font-size: 14px;
+    cursor: pointer;
+    transition: all 0.2s;
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+
+  .search-btn:hover:not(:disabled) { background: #00ffb3; transform: translateY(-1px); }
+  .search-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+  .quick-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-top: 12px;
+  }
+
+  .tag {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    padding: 4px 12px;
+    font-size: 12px;
+    color: var(--muted);
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+
+  .tag:hover { border-color: var(--accent); color: var(--accent); }
+
+  /* ========== ローディング ========== */
+  #loading {
+    display: none;
+    text-align: center;
+    padding: 40px;
+  }
+
+  .spinner {
+    width: 36px;
+    height: 36px;
+    border: 2px solid var(--border);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: spin 0.7s linear infinite;
+    margin: 0 auto 16px;
+  }
+
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  .loading-text {
+    color: var(--muted);
+    font-size: 13px;
+    font-family: 'Space Mono', monospace;
+  }
+
+  /* ========== 結果 ========== */
+  #results { display: none; }
+
+  .result-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 16px;
+  }
+
+  .result-title {
+    font-size: 13px;
+    color: var(--muted);
+    font-family: 'Space Mono', monospace;
+    letter-spacing: 1px;
+  }
+
+  .result-title span { color: var(--accent); }
+
+  .platforms {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    margin-bottom: 16px;
+  }
+
+  @media (max-width: 480px) {
+    .platforms { grid-template-columns: 1fr; }
+  }
+
+  .platform-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 16px;
+    text-decoration: none;
+    color: inherit;
+    display: block;
+    transition: all 0.2s;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .platform-card::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 2px;
+  }
+
+  .platform-card.mercari::before { background: var(--mercari); }
+  .platform-card.yahoo::before { background: var(--yahoo); }
+
+  .platform-card:hover {
+    border-color: rgba(255,255,255,0.15);
+    transform: translateY(-2px);
+    box-shadow: 0 8px 24px rgba(0,0,0,0.3);
+  }
+
+  .platform-name {
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    margin-bottom: 8px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .platform-card.mercari .platform-name { color: #ff6680; }
+  .platform-card.yahoo .platform-name { color: #ff8066; }
+
+  .platform-icon {
+    width: 18px;
+    height: 18px;
+    border-radius: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 10px;
+    font-weight: 900;
+    font-family: 'Space Mono', monospace;
+    flex-shrink: 0;
+  }
+
+  .mercari .platform-icon { background: var(--mercari); color: #fff; }
+  .yahoo .platform-icon { background: var(--yahoo); color: #fff; }
+
+  .price-range {
+    font-size: 20px;
+    font-weight: 900;
+    margin-bottom: 4px;
+    font-family: 'Space Mono', monospace;
+    color: var(--text);
+  }
+
+  .price-label {
+    font-size: 11px;
+    color: var(--muted);
+    margin-bottom: 12px;
+  }
+
+  .open-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    background: rgba(255,255,255,0.05);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 5px 10px;
+    font-size: 11px;
+    color: var(--muted);
+    font-family: 'Space Mono', monospace;
+    transition: all 0.15s;
+  }
+
+  .platform-card:hover .open-btn { color: var(--text); border-color: rgba(255,255,255,0.2); }
+
+  .analysis-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 20px;
+    margin-bottom: 12px;
+  }
+
+  .analysis-card h3 {
+    font-size: 11px;
+    letter-spacing: 2px;
+    color: var(--accent);
+    text-transform: uppercase;
+    font-family: 'Space Mono', monospace;
+    margin-bottom: 14px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .analysis-card h3::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: var(--border);
+  }
+
+  .analysis-text {
+    font-size: 14px;
+    line-height: 1.8;
+    color: var(--text);
+    white-space: pre-wrap;
+  }
+
+  .verdict-row {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 12px;
+  }
+
+  .verdict-chip {
+    flex: 1;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 14px;
+    text-align: center;
+  }
+
+  .verdict-chip .label {
+    font-size: 10px;
+    letter-spacing: 1.5px;
+    color: var(--muted);
+    text-transform: uppercase;
+    margin-bottom: 6px;
+    font-family: 'Space Mono', monospace;
+  }
+
+  .verdict-chip .value { font-size: 16px; font-weight: 700; }
+  .verdict-chip.buy .value { color: var(--accent); }
+  .verdict-chip.caution .value { color: #ffd166; }
+  .verdict-chip.skip .value { color: #ff6b6b; }
+
+  #empty {
+    text-align: center;
+    padding: 60px 20px;
+    color: var(--muted);
+  }
+
+  .empty-icon { font-size: 48px; margin-bottom: 16px; opacity: 0.4; }
+  .empty-text { font-size: 14px; line-height: 1.7; }
+
+  .error-card {
+    background: rgba(255,107,107,0.1);
+    border: 1px solid rgba(255,107,107,0.3);
+    border-radius: 10px;
+    padding: 16px;
+    color: #ff9999;
+    font-size: 13px;
+    line-height: 1.7;
+  }
+
+  .fade-in { animation: fadeIn 0.4s ease forwards; }
+
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+</style>
+</head>
+<body>
+<div class="container">
+  <header>
+    <div class="badge">AI Research Tool</div>
+    <h1>仕入れ<span>リサーチ</span>AI</h1>
+    <p class="subtitle">商品名を入れるとメルカリ・ヤフオクの相場を調べます</p>
+  </header>
+
+  <!-- APIキー設定パネル -->
+  <div id="apiKeyPanel">
+    <div class="api-title">🔑 APIキーを設定</div>
+    <div class="api-desc">
+      Anthropic APIキーを入力してください。キーはこのブラウザにだけ保存され、外部には送信されません。<br>
+      キーを持っていない方は <a href="https://console.anthropic.com/settings/keys" target="_blank">こちらから取得（無料枠あり）</a>
+    </div>
+    <div class="api-input-row">
+      <input type="password" id="apiKeyInput" placeholder="sk-ant-..." />
+      <button class="btn-save" onclick="saveApiKey()">保存</button>
+    </div>
+  </div>
+
+  <!-- 検索ボックス -->
+  <div class="search-box">
+    <div class="search-label">商品名を入力</div>
+    <div class="input-row">
+      <input type="text" id="queryInput" placeholder="例：ティファニー ネックレス、ニンテンドースイッチ..." />
+      <button class="search-btn" id="searchBtn" onclick="doSearch()">調べる</button>
+    </div>
+    <div class="quick-tags">
+      <div class="tag" onclick="setQuery('ブランドバッグ')">ブランドバッグ</div>
+      <div class="tag" onclick="setQuery('ゲームソフト')">ゲームソフト</div>
+      <div class="tag" onclick="setQuery('アクセサリー 金属')">アクセサリー</div>
+      <div class="tag" onclick="setQuery('家電 小型')">小型家電</div>
+      <div class="tag" onclick="setQuery('おもちゃ フィギュア')">フィギュア</div>
+      <div class="tag" onclick="setQuery('洋服 古着')">古着</div>
+    </div>
+  </div>
+
+  <div id="empty">
+    <div class="empty-icon">🔍</div>
+    <div class="empty-text">商品名を入力して「調べる」を押すと<br>メルカリ・ヤフオクの相場と<br>仕入れ判断をAIがお知らせします</div>
+  </div>
+
+  <div id="loading">
+    <div class="spinner"></div>
+    <div class="loading-text">AIがリサーチ中...</div>
+  </div>
+
+  <div id="results"></div>
+</div>
+
+<script>
+  const API_KEY_STORAGE = 'anthropic_api_key_research';
+
+  // ページ読み込み時にキーを確認
+  window.addEventListener('load', () => {
+    const saved = localStorage.getItem(API_KEY_STORAGE);
+    if (saved) showSavedState(saved);
+  });
+
+  function saveApiKey() {
+    const key = document.getElementById('apiKeyInput').value.trim();
+    if (!key.startsWith('sk-ant-')) {
+      alert('APIキーは「sk-ant-」から始まる文字列です。確認してください。');
+      return;
+    }
+    localStorage.setItem(API_KEY_STORAGE, key);
+    showSavedState(key);
+  }
+
+  function showSavedState(key) {
+    const panel = document.getElementById('apiKeyPanel');
+    panel.className = 'saved';
+    const masked = key.slice(0, 10) + '••••••••••••••••';
+    panel.innerHTML = `
+      <div class="api-saved-label">APIキー設定済み（${masked}）</div>
+      <button class="btn-reset" onclick="resetApiKey()">変更する</button>
+    `;
+  }
+
+  function resetApiKey() {
+    localStorage.removeItem(API_KEY_STORAGE);
+    const panel = document.getElementById('apiKeyPanel');
+    panel.className = '';
+    panel.innerHTML = `
+      <div class="api-title">🔑 APIキーを設定</div>
+      <div class="api-desc">
+        Anthropic APIキーを入力してください。キーはこのブラウザにだけ保存され、外部には送信されません。<br>
+        キーを持っていない方は <a href="https://console.anthropic.com/settings/keys" target="_blank">こちらから取得（無料枠あり）</a>
+      </div>
+      <div class="api-input-row">
+        <input type="password" id="apiKeyInput" placeholder="sk-ant-..." />
+        <button class="btn-save" onclick="saveApiKey()">保存</button>
+      </div>
+    `;
+  }
+
+  function getApiKey() {
+    return localStorage.getItem(API_KEY_STORAGE) || '';
+  }
+
+  function setQuery(text) {
+    document.getElementById('queryInput').value = text;
+    document.getElementById('queryInput').focus();
+  }
+
+  document.getElementById('queryInput').addEventListener('keydown', e => {
+    if (e.key === 'Enter') doSearch();
+  });
+
+  async function doSearch() {
+    const apiKey = getApiKey();
+    if (!apiKey) {
+      alert('先にAPIキーを設定してください。');
+      return;
+    }
+
+    const query = document.getElementById('queryInput').value.trim();
+    if (!query) return;
+
+    document.getElementById('empty').style.display = 'none';
+    document.getElementById('results').style.display = 'none';
+    document.getElementById('loading').style.display = 'block';
+    document.getElementById('searchBtn').disabled = true;
+
+    const mercariSoldUrl   = `https://jp.mercari.com/search?keyword=${encodeURIComponent(query)}&status=sold_out`;
+    const yahooSoldUrl     = `https://auctions.yahoo.co.jp/search/search?p=${encodeURIComponent(query)}&va=${encodeURIComponent(query)}&exflg=1&b=1&n=50&s1=cbids&o1=d&closed=1`;
+    const mercariSearchUrl = `https://jp.mercari.com/search?keyword=${encodeURIComponent(query)}`;
+    const yahooSearchUrl   = `https://auctions.yahoo.co.jp/search/search?p=${encodeURIComponent(query)}`;
+
+    const systemPrompt = `あなたは日本のフリマ・オークション市場に詳しいリサーチAIです。
+web_searchツールを使って最新の相場情報を調べ、必ず以下のJSON形式のみで回答してください。
+マークダウンのコードブロック、説明文、前置きは一切不要です。JSONのみを出力してください。
+
+出力形式：
+{"mercari":{"low":0,"high":0,"avg":0},"yahoo":{"low":0,"high":0,"avg":0},"verdict":"buy","verdict_label":"仕入れ推奨","resale_tip":"テキスト","market_summary":"テキスト","buy_price_suggestion":0}
+
+verdictは "buy"、"caution"、"skip" のいずれか。
+verdict_labelは "仕入れ推奨"、"要検討"、"見送り" のいずれか。
+数値はすべて整数の円単位。`;
+
+    const userPrompt = `商品名：${query}\n\nメルカリとヤフオクの相場を調べてJSONで回答してください。resale_tipにはEcoringで仕入れる場合の視点も含めてください。`;
+
+    const headers = {
+      "Content-Type": "application/json",
+      "x-api-key": apiKey,
+      "anthropic-version": "2023-06-01",
+      "anthropic-dangerous-direct-browser-access": "true"
+    };
+
+    try {
+      const res1 = await fetch("https://api.anthropic.com/v1/messages", {
+        method: "POST",
+        headers,
+        body: JSON.stringify({
+          model: "claude-sonnet-4-20250514",
+          max_tokens: 1500,
+          system: systemPrompt,
+          tools: [{ type: "web_search_20250305", name: "web_search" }],
+          messages: [{ role: "user", content: userPrompt }]
+        })
+      });
+
+      const data1 = await res1.json();
+      if (!res1.ok) throw new Error(data1.error?.message || `API Error ${res1.status}`);
+
+      let finalText = "";
+
+      if (data1.stop_reason === "tool_use" || data1.content.some(b => b.type === "tool_use")) {
+        const toolResults = data1.content
+          .filter(b => b.type === "tool_use")
+          .map(b => ({
+            type: "tool_result",
+            tool_use_id: b.id,
+            content: b.content || "検索完了"
+          }));
+
+        const res2 = await fetch("https://api.anthropic.com/v1/messages", {
+          method: "POST",
+          headers,
+          body: JSON.stringify({
+            model: "claude-sonnet-4-20250514",
+            max_tokens: 1500,
+            system: systemPrompt,
+            tools: [{ type: "web_search_20250305", name: "web_search" }],
+            messages: [
+              { role: "user", content: userPrompt },
+              { role: "assistant", content: data1.content },
+              { role: "user", content: toolResults }
+            ]
+          })
+        });
+
+        const data2 = await res2.json();
+        if (!res2.ok) throw new Error(data2.error?.message || `API Error ${res2.status}`);
+        finalText = data2.content.filter(b => b.type === "text").map(b => b.text).join("\n");
+      } else {
+        finalText = data1.content.filter(b => b.type === "text").map(b => b.text).join("\n");
+      }
+
+      const clean = finalText.replace(/```json|```/g, "").trim();
+      const jsonMatch = clean.match(/\{[\s\S]*\}/);
+      if (!jsonMatch) throw new Error("レスポンス解析失敗: " + finalText.slice(0, 100));
+      const info = JSON.parse(jsonMatch[0]);
+
+      renderResults(query, info, mercariSoldUrl, yahooSoldUrl, mercariSearchUrl, yahooSearchUrl);
+
+    } catch (err) {
+      document.getElementById('loading').style.display = 'none';
+      document.getElementById('results').style.display = 'block';
+      let msg = err.message;
+      if (msg.includes("401")) msg = "APIキーが無効です。キーを確認してください。";
+      if (msg.includes("429")) msg = "API利用制限に達しました。しばらく待ってからお試しください。";
+      document.getElementById('results').innerHTML = `<div class="error-card">⚠️ ${msg}</div>`;
+    }
+
+    document.getElementById('searchBtn').disabled = false;
+  }
+
+  function fmt(n) {
+    return Number(n).toLocaleString('ja-JP') + '円';
+  }
+
+  function renderResults(query, info, mercariSoldUrl, yahooSoldUrl, mercariSearchUrl, yahooSearchUrl) {
+    document.getElementById('loading').style.display = 'none';
+    const verdictClass = info.verdict || 'caution';
+
+    const html = `
+      <div class="fade-in">
+        <div class="result-header">
+          <div class="result-title">「<span>${query}</span>」の相場</div>
+        </div>
+
+        <div class="verdict-row">
+          <div class="verdict-chip ${verdictClass}">
+            <div class="label">仕入れ判断</div>
+            <div class="value">${info.verdict_label || '要検討'}</div>
+          </div>
+          <div class="verdict-chip">
+            <div class="label">仕入れ目安価格</div>
+            <div class="value" style="color:var(--accent)">${fmt(info.buy_price_suggestion)}<span style="font-size:11px;color:var(--muted)">以下</span></div>
+          </div>
+        </div>
+
+        <div class="platforms">
+          <a class="platform-card mercari" href="${mercariSearchUrl}" target="_blank" rel="noopener">
+            <div class="platform-name"><span class="platform-icon">M</span>メルカリ</div>
+            <div class="price-range">${fmt(info.mercari.low)}〜<br>${fmt(info.mercari.high)}</div>
+            <div class="price-label">平均 ${fmt(info.mercari.avg)}</div>
+            <div class="open-btn">出品を見る →</div>
+          </a>
+          <a class="platform-card yahoo" href="${yahooSearchUrl}" target="_blank" rel="noopener">
+            <div class="platform-name"><span class="platform-icon">Y</span>ヤフオク</div>
+            <div class="price-range">${fmt(info.yahoo.low)}〜<br>${fmt(info.yahoo.high)}</div>
+            <div class="price-label">平均 ${fmt(info.yahoo.avg)}</div>
+            <div class="open-btn">落札を見る →</div>
+          </a>
+        </div>
+
+        <div class="platforms" style="margin-bottom:12px">
+          <a class="platform-card mercari" href="${mercariSoldUrl}" target="_blank" rel="noopener" style="opacity:0.7">
+            <div class="platform-name"><span class="platform-icon">M</span>売り切れ実績</div>
+            <div style="font-size:12px;color:var(--muted);margin-top:4px">実際の成約価格を確認</div>
+            <div class="open-btn" style="margin-top:12px">売り切れを見る →</div>
+          </a>
+          <a class="platform-card yahoo" href="${yahooSoldUrl}" target="_blank" rel="noopener" style="opacity:0.7">
+            <div class="platform-name"><span class="platform-icon">Y</span>落札実績</div>
+            <div style="font-size:12px;color:var(--muted);margin-top:4px">終了したオークションを確認</div>
+            <div class="open-btn" style="margin-top:12px">落札実績を見る →</div>
+          </a>
+        </div>
+
+        <div class="analysis-card">
+          <h3>相場分析</h3>
+          <div class="analysis-text">${info.market_summary}</div>
+        </div>
+
+        <div class="analysis-card">
+          <h3>仕入れのポイント</h3>
+          <div class="analysis-text">${info.resale_tip}</div>
+        </div>
+      </div>
+    `;
+
+    document.getElementById('results').innerHTML = html;
+    document.getElementById('results').style.display = 'block';
+  }
+</script>
+</body>
+</html>
